@@ -1,4 +1,3 @@
-import SectionRenderer from "@/app/components/SectionRenderer";
 /**
  * app/[slug]/page.jsx
  * ─────────────────────────────────────────────
@@ -14,6 +13,10 @@ import SectionRenderer from "@/app/components/SectionRenderer";
  *   3. Visit /pricing — it works. Zero new Next.js files needed.
  */
 
+import SectionRenderer from "@/app/components/SectionRenderer";
+
+export const dynamic = "force-dynamic"; // ← ADD THIS
+
 const BASE = process.env.NEXT_PUBLIC_STRAPI_URL || "http://localhost:1337";
 const TOKEN = process.env.NEXT_PUBLIC_STRAPI_TOKEN || "";
 
@@ -21,7 +24,10 @@ async function fetchPage(slug: string) {
   try {
     const params = new URLSearchParams();
     params.set("filters[slug][$eq]", slug);
-    params.set("status", "draft");
+    // Remove status=draft for production — only fetch published content
+    if (process.env.NODE_ENV === "development") {
+      params.set("status", "draft");
+    }
 
     const url = `${BASE}/api/pages?${params.toString()}`;
     console.log("[fetchPage] URL:", url);
@@ -41,7 +47,6 @@ async function fetchPage(slug: string) {
     }
 
     const json = await res.json();
-    console.log("[fetchPage] data:", JSON.stringify(json?.data?.[0]?.sections));
     return json?.data?.[0] ?? null;
   } catch (err) {
     console.error(`[DynamicPage] fetch error for slug "${slug}":`, err);
@@ -49,19 +54,7 @@ async function fetchPage(slug: string) {
   }
 }
 
-export async function generateStaticParams() {
-  try {
-    const res = await fetch(`${BASE}/api/pages?fields=slug`, {
-      headers: { ...(TOKEN && { Authorization: `Bearer ${TOKEN}` }) },
-    });
-    const json = await res.json();
-    return (json?.data ?? []).map((page: { slug: string }) => ({
-      slug: page.slug,
-    }));
-  } catch {
-    return [];
-  }
-}
+// ← DELETE generateStaticParams entirely
 
 export default async function DynamicPage({
   params,
@@ -79,9 +72,6 @@ export default async function DynamicPage({
           <p className="text-slate-500">
             Page <code className="bg-slate-100 px-2 py-1 rounded">/{slug}</code>{" "}
             not found in Strapi.
-          </p>
-          <p className="text-slate-400 text-sm mt-2">
-            Add a Page entry with slug "{slug}" in Strapi to create this page.
           </p>
         </div>
       </main>
